@@ -27,12 +27,12 @@ func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	var items []*pb.ItemsWithQuantity
 
 	if err := common.ReadJSON(r, &items); err != nil {
-		common.WriteError(w, http.StatusBadRequest, err)
+		common.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := validateItems(items); err != nil {
-		common.WriteError(w, http.StatusBadRequest, err)
+		common.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -55,7 +55,7 @@ func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 
 func validateItems(items []*pb.ItemsWithQuantity) error {
 	if len(items) == 0 {
-		return errors.New("at least one item is required")
+		return common.ErrNoItems
 	}
 
 	for _, item := range items {

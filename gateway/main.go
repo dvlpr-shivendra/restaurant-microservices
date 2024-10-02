@@ -1,38 +1,57 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"restaurant-backend/common"
+	"restaurant-backend/gateway/gateway"
+	"time"
 
 	_ "github.com/joho/godotenv/autoload"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
-	pb "restaurant-backend/common/api"
+	"restaurant-backend/common/discovery"
+	"restaurant-backend/common/discovery/consul"
 )
 
 var (
-	httpAddress          = common.Env("HTTP_ADDRESS", ":8080")
-	ordersServiceAddress = "localhost:2000"
+	serviceName   = "gateway"
+	httpAddress   = common.Env("HTTP_ADDRESS", ":8080")
+	consulAddress = common.Env("CONSUL_ADDRESS", "localhost:8500")
 )
 
 func main() {
-	conn, err := grpc.NewClient(ordersServiceAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	registry, err := consul.NewRegistry(consulAddress, serviceName)
 
 	if err != nil {
-		log.Fatalf("Could not connect to orders service: %v", err)
+		panic(err)
 	}
 
-	defer conn.Close()
+	ctx := context.Background()
+	instanceId := discovery.GenerateInstanceID(serviceName)
 
-	log.Printf("Orders service started at %s", ordersServiceAddress)
+	if err := registry.Register(ctx, instanceId, serviceName, httpAddress); err != nil {
+		panic(err)
+	}
 
-	c := pb.NewOrderServiceClient(conn)
+	go func() {
+		for {
+			if err := registry.HealthCheck(instanceId, serviceName); err != nil {
+				log.Printf("Failed to check health: %v", err)
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	defer registry.DeRegister(ctx, instanceId, serviceName)
 
 	mux := http.NewServeMux()
 
-	handler := NewHandler(c)
+	ordersGateway := gateway.NewGRPCGateway(registry)
+
+	handler := NewHandler(ordersGateway)
+
 	handler.registerRoutes(mux)
 
 	log.Printf("Starting server on %s", httpAddress)

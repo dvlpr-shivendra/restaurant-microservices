@@ -52,10 +52,6 @@ func main() {
 
 	channel, close := broker.Connect(amqpUser, amqpPassword, amqpHost, amqpPort)
 
-	if channel == nil {
-		log.Fatal("RabbitMQ channel is nil")
-	}
-
 	defer func() {
 		close()
 		channel.Close()

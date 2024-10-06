@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"restaurant-backend/common"
+	"restaurant-backend/common/broker"
 	"restaurant-backend/common/discovery"
 	"restaurant-backend/common/discovery/consul"
 	"time"
@@ -16,6 +17,10 @@ var (
 	serviceName   = "orders"
 	grpcAddress   = common.Env("GRPC_ADDRESS", "localhost:2000")
 	consulAddress = common.Env("CONSUL_ADDRESS", "localhost:8500")
+	amqpUser      = common.Env("RABBITMQ_USER", "guest")
+	amqpPassword  = common.Env("RABBITMQ_PASSWORD", "guest")
+	amqpHost      = common.Env("RABBITMQ_HOST", "localhost")
+	amqpPort      = common.Env("RABBITMQ_PORT", "5672")
 )
 
 func main() {
@@ -45,6 +50,17 @@ func main() {
 
 	defer registry.DeRegister(ctx, instanceId, serviceName)
 
+	channel, close := broker.Connect(amqpUser, amqpPassword, amqpHost, amqpPort)
+
+	if channel == nil {
+		log.Fatal("RabbitMQ channel is nil")
+	}
+
+	defer func() {
+		close()
+		channel.Close()
+	}()
+
 	grpcServer := grpc.NewServer()
 
 	l, err := net.Listen("tcp", grpcAddress)
@@ -56,8 +72,11 @@ func main() {
 	defer l.Close()
 
 	store := NewStore()
+
 	service := NewService(store)
-	NewGrpcHandler(grpcServer, service)
+
+	NewGrpcHandler(grpcServer, service, channel)
+
 	service.CreateOrder(context.Background())
 
 	log.Printf("Orders service started at %s", grpcAddress)

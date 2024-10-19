@@ -8,7 +8,10 @@ import (
 	"restaurant-backend/common/broker"
 	"restaurant-backend/common/discovery"
 	"restaurant-backend/common/discovery/consul"
+	"restaurant-backend/payments/processor/payu"
 	"time"
+
+	_ "github.com/joho/godotenv/autoload"
 
 	"google.golang.org/grpc"
 )
@@ -50,6 +53,8 @@ func main() {
 
 	defer registry.DeRegister(ctx, instanceId, serviceName)
 
+	payuProcessor := payu.NewProcessor()
+
 	channel, close := broker.Connect(amqpUser, amqpPassword, amqpHost, amqpPort)
 
 	defer func() {
@@ -57,7 +62,7 @@ func main() {
 		channel.Close()
 	}()
 
-	service := NewService()
+	service := NewService(payuProcessor)
 
 	amqpConsumer := NewConsumer(service)
 

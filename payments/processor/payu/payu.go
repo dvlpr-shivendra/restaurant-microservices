@@ -1,13 +1,6 @@
 package payu
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"mime/multipart"
-	"net/http"
-	"restaurant-backend/common"
 	pb "restaurant-backend/common/api"
 )
 

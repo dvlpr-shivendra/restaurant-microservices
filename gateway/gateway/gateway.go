@@ -6,5 +6,6 @@ import (
 )
 
 type OrdersGateway interface {
-	CreateOrder(context.Context, *pb.CreateOrderRequest) (*pb.Order, error)
+	CreateOrder(ctx context.Context, order *pb.CreateOrderRequest) (*pb.Order, error)
+	GetOrder(ctx context.Context, orderId, customerId string) (*pb.Order, error)
 }

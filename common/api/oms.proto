@@ -5,25 +5,31 @@ option go_package = "common/api";
 package api;
 
 message Order {
-     string ID = 1;
-     string customerID = 2;
+     string Id = 1;
+     string customerId = 2;
      string Status = 3;
      repeated Item items = 4;
 }
 
 message Item {
-     string ID = 1;
+     string Id = 1;
      string Name = 2;
      int32 Quantity = 3;
-     string priceID = 4;
+     string priceId = 4;
 }
 
 service OrderService {
      rpc createOrder (CreateOrderRequest) returns (Order);
+     rpc GetOrder (GetOrderRequest) returns (Order);
+}
+
+message GetOrderRequest {
+     string OrderId = 1;
+     string customerId = 2;
 }
 
 message ItemsWithQuantity {
-     string ID = 1;
+     string Id = 1;
      int32 Quantity = 2;
 }
 

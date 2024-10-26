@@ -20,10 +20,31 @@ func NewHandler(gateway gateway.OrdersGateway) *handler {
 }
 
 func (h *handler) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/customers/{customerId}/orders", h.HandleCreateOrder)
+	// Serve public directory
+	mux.Handle("/", http.FileServer(http.Dir("public")))
+	mux.HandleFunc("POST /api/customers/{customerId}/orders", h.handleCreateOrder)
+	mux.HandleFunc("GET /api/customers/{customerId}/orders/{orderId}", h.handleGetOrder)
 }
 
-func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+	customerId := r.PathValue("customerId")
+	orderId := r.PathValue("orderId")
+
+	order, err := h.gateway.GetOrder(r.Context(), orderId, customerId)
+
+	rStatus := status.Convert(err)
+
+	if rStatus != nil {
+		if rStatus.Code() != codes.InvalidArgument {
+			common.WriteError(w, http.StatusBadRequest, rStatus.Message())
+			return
+		}
+	}
+
+	common.WriteJSON(w, http.StatusOK, order)
+}
+
+func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	var items []*pb.ItemsWithQuantity
 
@@ -60,8 +81,8 @@ func validateItems(items []*pb.ItemsWithQuantity) error {
 	}
 
 	for _, item := range items {
-		if item.ID == "" {
-			return errors.New("items ID is required")
+		if item.Id == "" {
+			return errors.New("items Id is required")
 		}
 
 		if item.Quantity <= 0 {

@@ -54,7 +54,7 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 				continue
 			}
 
-			log.Printf("Payment created for order with ID %s : %v", order.ID, paymentLink)
+			log.Printf("Payment created for order with Id %s : %v", order.Id, paymentLink)
 		}
 	}()
 

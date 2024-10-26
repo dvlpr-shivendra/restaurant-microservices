@@ -28,11 +28,23 @@ func NewGrpcHandler(grpcServer *grpc.Server, service OrdersService, channel *amq
 	return &grpcHandler{}
 }
 
+func (h *grpcHandler) GetOrder(ctx context.Context, p *pb.GetOrderRequest) (*pb.Order, error) {
+	return h.service.GetOrder(ctx, p)
+}
+
 func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest) (*pb.Order, error) {
 	log.Println("New order received")
 
-	order := &pb.Order{
-		ID: "123",
+	items, err := h.service.ValidateOrder(ctx, p)
+
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := h.service.CreateOrder(ctx, p, items)
+
+	if err != nil {
+		return nil, err
 	}
 
 	marshallOrder, err := json.Marshal(order)
@@ -48,8 +60,8 @@ func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest)
 	}
 
 	h.channel.PublishWithContext(ctx, "", queue.Name, false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        marshallOrder,
+		ContentType:  "application/json",
+		Body:         marshallOrder,
 		DeliveryMode: amqp.Persistent,
 	})
 

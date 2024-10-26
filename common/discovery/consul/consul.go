@@ -29,7 +29,7 @@ func NewRegistry(addr, serviceName string) (*Registry, error) {
 	return &Registry{client}, nil
 }
 
-func (r *Registry) Register(ctx context.Context, instanceID, serverName, hostPort string) error {
+func (r *Registry) Register(ctx context.Context, instanceId, serverName, hostPort string) error {
 	parts := strings.Split(hostPort, ":")
 
 	if len(parts) != 2 {
@@ -45,12 +45,12 @@ func (r *Registry) Register(ctx context.Context, instanceID, serverName, hostPor
 	host := parts[0]
 
 	return r.client.Agent().ServiceRegister(&consul.AgentServiceRegistration{
-		ID:      instanceID,
+		ID:      instanceId,
 		Address: host,
 		Port:    port,
 		Name:    serverName,
 		Check: &consul.AgentServiceCheck{
-			CheckID:                        instanceID,
+			CheckID:                        instanceId,
 			TLSSkipVerify:                  true,
 			TTL:                            "5s",
 			Timeout:                        "1s",
@@ -59,9 +59,9 @@ func (r *Registry) Register(ctx context.Context, instanceID, serverName, hostPor
 	})
 }
 
-func (r *Registry) DeRegister(ctx context.Context, instanceID, serverName string) error {
-	log.Printf("De-registering %s", instanceID)
-	return r.client.Agent().ServiceDeregister(instanceID)
+func (r *Registry) DeRegister(ctx context.Context, instanceId, serverName string) error {
+	log.Printf("De-registering %s", instanceId)
+	return r.client.Agent().ServiceDeregister(instanceId)
 }
 
 func (r *Registry) Discover(ctx context.Context, serviceName string) ([]string, error) {
@@ -80,6 +80,6 @@ func (r *Registry) Discover(ctx context.Context, serviceName string) ([]string, 
 	return instances, nil
 }
 
-func (r *Registry) HealthCheck(instanceID, serviceName string) error {
-	return r.client.Agent().UpdateTTL(instanceID, "online", consul.HealthPassing)
+func (r *Registry) HealthCheck(instanceId, serviceName string) error {
+	return r.client.Agent().UpdateTTL(instanceId, "online", consul.HealthPassing)
 }

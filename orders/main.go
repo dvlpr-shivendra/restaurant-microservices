@@ -32,7 +32,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	instanceId := discovery.GenerateInstanceID(serviceName)
+	instanceId := discovery.GenerateInstanceId(serviceName)
 
 	if err := registry.Register(ctx, instanceId, serviceName, grpcAddress); err != nil {
 		panic(err)
@@ -72,8 +72,6 @@ func main() {
 	service := NewService(store)
 
 	NewGrpcHandler(grpcServer, service, channel)
-
-	service.CreateOrder(context.Background())
 
 	log.Printf("Orders service started at %s", grpcAddress)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"restaurant-backend/common"
 	"restaurant-backend/common/broker"
 	"restaurant-backend/common/discovery"
@@ -24,6 +25,7 @@ var (
 	amqpPassword  = common.Env("RABBITMQ_PASSWORD", "guest")
 	amqpHost      = common.Env("RABBITMQ_HOST", "localhost")
 	amqpPort      = common.Env("RABBITMQ_PORT", "5672")
+	httpAddress   = common.Env("HTTP_ADDRESS", "localhost:8081")
 )
 
 func main() {
@@ -68,10 +70,23 @@ func main() {
 
 	go amqpConsumer.Listen(channel)
 
+	mux := http.NewServeMux()
+	httpServer := NewPaymentHTTPHandler(channel)
+	httpServer.registerRoutes(mux)
+
+	go func() {
+		log.Println("Starting HTTP server on", httpAddress)
+		if err := http.ListenAndServe(httpAddress, mux); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	grpcServer := grpc.NewServer()
 
 	l, err := net.Listen("tcp", grpcAddress)
 
+	log.Println("Starting gRPC server on", grpcAddress)
+	
 	if err != nil {
 		log.Fatal(err.Error())
 	}

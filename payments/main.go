@@ -9,6 +9,7 @@ import (
 	"restaurant-backend/common/broker"
 	"restaurant-backend/common/discovery"
 	"restaurant-backend/common/discovery/consul"
+	"restaurant-backend/payments/gateway"
 	"restaurant-backend/payments/processor/payu"
 	"time"
 
@@ -64,7 +65,9 @@ func main() {
 		channel.Close()
 	}()
 
-	service := NewService(payuProcessor)
+	gateway := gateway.NewGRPCGateway(registry)
+
+	service := NewService(payuProcessor, gateway)
 
 	amqpConsumer := NewConsumer(service)
 

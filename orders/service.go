@@ -38,6 +38,16 @@ func (s *service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest, i
 	return order, nil
 }
 
+func (s *service) UpdateOrder(ctx context.Context, order *pb.Order) (*pb.Order, error) {
+	err := s.store.Update(ctx, order.Id, order)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return order, nil
+}
+
 func (s *service) ValidateOrder(ctx context.Context, req *pb.CreateOrderRequest) ([]*pb.Item, error) {
 	if len(req.Items) == 0 {
 		return nil, common.ErrNoItems

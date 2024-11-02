@@ -67,3 +67,7 @@ func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest)
 
 	return order, nil
 }
+
+func (h *grpcHandler) UpdateOrder(ctx context.Context, order *pb.Order) (*pb.Order, error) {
+	return h.service.UpdateOrder(ctx, order)
+}

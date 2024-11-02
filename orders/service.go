@@ -33,6 +33,7 @@ func (s *service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest, i
 		CustomerId: req.CustomerId,
 		Items:      items,
 		Status:     "pending",
+		PaymentLink: "",
 	}
 
 	return order, nil

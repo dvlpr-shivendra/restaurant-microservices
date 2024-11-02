@@ -38,11 +38,11 @@ func (s *store) Get(ctx context.Context, id, customerId string) (*pb.Order, erro
 	return nil, errors.New("order not found")
 }
 
-func (s *store) Update(ctx context.Context, id string, order *pb.Order) error {
-	for i, o := range orders {
-		if o.Id == id {
-			orders[i].Status = o.Status
-			orders[i].PaymentLink = o.PaymentLink
+func (s *store) Update(ctx context.Context, id string, newOrder *pb.Order) error {
+	for i, order := range orders {
+		if order.Id == id {
+			orders[i].Status = newOrder.Status
+			orders[i].PaymentLink = newOrder.PaymentLink
 			return nil
 		}
 	}

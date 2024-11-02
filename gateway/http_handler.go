@@ -72,7 +72,12 @@ func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	common.WriteJSON(w, http.StatusCreated, order)
+	res := &CreateOrderResponse{
+		Order:       order,
+		RedirectUrl: "http://localhost:8080/payment/success.html?customerID=" + order.CustomerId + "&orderID=" + order.Id,
+	}
+
+	common.WriteJSON(w, http.StatusCreated, res)
 }
 
 func validateItems(items []*pb.ItemsWithQuantity) error {

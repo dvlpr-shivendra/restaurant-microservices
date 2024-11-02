@@ -3,9 +3,16 @@
         "fanout",
         "firstname",
         "inmem",
+        "opentelemetry",
+        "otel",
+        "otelgrpc",
+        "otlp",
+        "otlptrace",
+        "otlptracehttp",
         "payu",
         "productinfo",
         "rabbitmq",
+        "semconv",
         "surl",
         "txnid"
     ]

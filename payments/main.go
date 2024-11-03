@@ -27,7 +27,7 @@ var (
 	amqpHost      = common.Env("RABBITMQ_HOST", "localhost")
 	amqpPort      = common.Env("RABBITMQ_PORT", "5672")
 	httpAddress   = common.Env("HTTP_ADDRESS", "localhost:8081")
-	jaegerAddress   = common.Env("HTTP_ADDRESS", "localhost:4318")
+	jaegerAddress = common.Env("HTTP_ADDRESS", "localhost:4318")
 )
 
 func main() {
@@ -75,7 +75,9 @@ func main() {
 
 	service := NewService(payuProcessor, gateway)
 
-	amqpConsumer := NewConsumer(service)
+	serviceWithTelemetry := NewTelemetryMiddleware(service)
+
+	amqpConsumer := NewConsumer(serviceWithTelemetry)
 
 	go amqpConsumer.Listen(channel)
 

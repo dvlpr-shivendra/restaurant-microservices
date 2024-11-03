@@ -10,6 +10,7 @@ import (
 	"restaurant-backend/common/discovery/consul"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -25,6 +26,11 @@ var (
 )
 
 func main() {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	zap.ReplaceGlobals(logger)
+
 	err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddress)
 
 	if err != nil {
@@ -78,10 +84,11 @@ func main() {
 	service := NewService(store)
 
 	serviceWithTelemetry := NewTelemetryMiddleware(service)
+	serviceWithLogging := NewLoggingMiddleware(serviceWithTelemetry)
 
-	NewGrpcHandler(grpcServer, serviceWithTelemetry, channel)
+	NewGrpcHandler(grpcServer, serviceWithLogging, channel)
 
-	consumer := NewConsumer(serviceWithTelemetry)
+	consumer := NewConsumer(serviceWithLogging)
 
 	go consumer.Listen(channel)
 

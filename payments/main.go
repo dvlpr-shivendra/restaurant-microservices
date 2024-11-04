@@ -5,105 +5,102 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"restaurant-backend/common"
-	"restaurant-backend/common/broker"
-	"restaurant-backend/common/discovery"
-	"restaurant-backend/common/discovery/consul"
-	"restaurant-backend/payments/gateway"
-	"restaurant-backend/payments/processor/payu"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
-
+	common "github.com/sikozonpc/commons"
+	"github.com/sikozonpc/commons/broker"
+	"github.com/sikozonpc/commons/discovery"
+	"github.com/sikozonpc/commons/discovery/consul"
+	"github.com/sikozonpc/omsv2-payments/gateway"
+	stripeProcessor "github.com/sikozonpc/omsv2-payments/processor/stripe"
+	"github.com/stripe/stripe-go/v78"
 	"google.golang.org/grpc"
 )
 
 var (
-	serviceName   = "payment"
-	grpcAddress   = common.Env("GRPC_ADDRESS", "localhost:2001")
-	consulAddress = common.Env("CONSUL_ADDRESS", "localhost:8500")
-	amqpUser      = common.Env("RABBITMQ_USER", "guest")
-	amqpPassword  = common.Env("RABBITMQ_PASSWORD", "guest")
-	amqpHost      = common.Env("RABBITMQ_HOST", "localhost")
-	amqpPort      = common.Env("RABBITMQ_PORT", "5672")
-	httpAddress   = common.Env("HTTP_ADDRESS", "localhost:8081")
-	jaegerAddress = common.Env("HTTP_ADDRESS", "localhost:4318")
+	serviceName          = "payment"
+	amqpUser             = common.EnvString("RABBITMQ_USER", "guest")
+	amqpPass             = common.EnvString("RABBITMQ_PASS", "guest")
+	amqpHost             = common.EnvString("RABBITMQ_HOST", "localhost")
+	amqpPort             = common.EnvString("RABBITMQ_PORT", "5672")
+	grpcAddr             = common.EnvString("GRPC_ADDRESS", "localhost:2001")
+	consulAddr           = common.EnvString("CONSUL_ADDR", "localhost:8500")
+	stripeKey            = common.EnvString("STRIPE_KEY", "")
+	httpAddr             = common.EnvString("HTTP_ADDR", "localhost:8081")
+	endpointStripeSecret = common.EnvString("STRIPE_ENDPOINT_SECRET", "whsec_...")
+	jaegerAddr           = common.EnvString("JAEGER_ADDR", "localhost:4318")
 )
 
 func main() {
-	err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddress)
-
-	if err != nil {
-		log.Fatalf("Failed to set tracer: %v", err)
+	if err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddr); err != nil {
+		log.Fatal("failed to set global tracer")
 	}
 
-	registry, err := consul.NewRegistry(consulAddress, serviceName)
-
+	// Register consul
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
 	if err != nil {
 		panic(err)
 	}
 
-	ctx := context.Background()
-	instanceId := discovery.GenerateInstanceId(serviceName)
+	instanceID := discovery.GenerateInstanceID(serviceName)
 
-	if err := registry.Register(ctx, instanceId, serviceName, grpcAddress); err != nil {
+	ctx := context.Background()
+	if err := registry.Register(ctx, instanceID, serviceName, grpcAddr); err != nil {
 		panic(err)
 	}
 
 	go func() {
 		for {
-			if err := registry.HealthCheck(instanceId, serviceName); err != nil {
-				log.Printf("Failed to check health: %v", err)
+			if err := registry.HealthCheck(instanceID, serviceName); err != nil {
+				log.Fatalf("failed to health check %v", err.Error())
 			}
-
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}()
+	defer registry.Deregister(ctx, instanceID, serviceName)
 
-	defer registry.DeRegister(ctx, instanceId, serviceName)
+	// stripe setup
+	stripe.Key = stripeKey
 
-	payuProcessor := payu.NewProcessor()
-
-	channel, close := broker.Connect(amqpUser, amqpPassword, amqpHost, amqpPort)
-
+	// Broker connection
+	ch, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
 	defer func() {
 		close()
-		channel.Close()
+		ch.Close()
 	}()
 
-	gateway := gateway.NewGRPCGateway(registry)
+	stripeProcessor := stripeProcessor.NewProcessor()
+	gateway := gateway.NewGateway(registry)
+	svc := NewService(stripeProcessor, gateway)
+	svcWithTelemetry := NewTelemetryMiddleware(svc)
 
-	service := NewService(payuProcessor, gateway)
+	amqpConsumer := NewConsumer(svcWithTelemetry)
+	go amqpConsumer.Listen(ch)
 
-	serviceWithTelemetry := NewTelemetryMiddleware(service)
-
-	amqpConsumer := NewConsumer(serviceWithTelemetry)
-
-	go amqpConsumer.Listen(channel)
-
+	// http server
 	mux := http.NewServeMux()
-	httpServer := NewPaymentHTTPHandler(channel)
+
+	httpServer := NewPaymentHTTPHandler(ch)
 	httpServer.registerRoutes(mux)
 
 	go func() {
-		log.Println("Starting HTTP server on", httpAddress)
-		if err := http.ListenAndServe(httpAddress, mux); err != nil {
-			log.Fatal(err)
+		log.Printf("Starting HTTP server at %s", httpAddr)
+		if err := http.ListenAndServe(httpAddr, mux); err != nil {
+			log.Fatal("failed to start http server")
 		}
 	}()
 
+	// gRPC server
 	grpcServer := grpc.NewServer()
 
-	l, err := net.Listen("tcp", grpcAddress)
-
-	log.Println("Starting gRPC server on", grpcAddress)
-
+	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("failed to listen: %v", err)
 	}
-
 	defer l.Close()
 
+	log.Println("GRPC Server Started at ", grpcAddr)
 	if err := grpcServer.Serve(l); err != nil {
 		log.Fatal(err.Error())
 	}

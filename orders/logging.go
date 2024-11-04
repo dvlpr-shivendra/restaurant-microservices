@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	pb "restaurant-backend/common/api"
+	pb "github.com/sikozonpc/commons/api"
 	"go.uber.org/zap"
 )
 

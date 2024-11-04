@@ -34,7 +34,7 @@ func (r *Registry) Register(ctx context.Context, instanceID, serviceName, hostPo
 	return nil
 }
 
-func (r *Registry) DeRegister(ctx context.Context, instanceID, serviceName string) error {
+func (r *Registry) Deregister(ctx context.Context, instanceID, serviceName string) error {
 	r.Lock()
 	defer r.Unlock()
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	pb "github.com/sikozonpc/commons/api"
 	"go.opentelemetry.io/otel/trace"
-	pb "restaurant-backend/common/api"
 )
 
 type TelemetryMiddleware struct {

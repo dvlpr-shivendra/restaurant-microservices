@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	pb "restaurant-backend/common/api"
+
+	pb "github.com/sikozonpc/commons/api"
 )
 
 type PaymentsService interface {

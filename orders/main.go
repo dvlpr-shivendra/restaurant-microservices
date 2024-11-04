@@ -2,27 +2,35 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net"
-	"restaurant-backend/common"
-	"restaurant-backend/common/broker"
-	"restaurant-backend/common/discovery"
-	"restaurant-backend/common/discovery/consul"
 	"time"
 
+	_ "github.com/joho/godotenv/autoload"
+	common "github.com/sikozonpc/commons"
+	"github.com/sikozonpc/commons/broker"
+	"github.com/sikozonpc/commons/discovery"
+	"github.com/sikozonpc/commons/discovery/consul"
+	"github.com/sikozonpc/omsv2-orders/gateway"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
 var (
-	serviceName   = "orders"
-	grpcAddress   = common.Env("GRPC_ADDRESS", "localhost:2000")
-	consulAddress = common.Env("CONSUL_ADDRESS", "localhost:8500")
-	amqpUser      = common.Env("RABBITMQ_USER", "guest")
-	amqpPassword  = common.Env("RABBITMQ_PASSWORD", "guest")
-	amqpHost      = common.Env("RABBITMQ_HOST", "localhost")
-	amqpPort      = common.Env("RABBITMQ_PORT", "5672")
-	jaegerAddress = common.Env("JAEGER_ADDRESS", "localhost:4318")
+	serviceName = "orders"
+	grpcAddr    = common.EnvString("GRPC_ADDR", "localhost:2000")
+	consulAddr  = common.EnvString("CONSUL_ADDR", "localhost:8500")
+	amqpUser    = common.EnvString("RABBITMQ_USER", "guest")
+	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
+	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
+	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
+	mongoUser   = common.EnvString("MONGO_DB_USER", "root")
+	mongoPass   = common.EnvString("MONGO_DB_PASS", "example")
+	mongoAddr   = common.EnvString("MONGO_DB_HOST", "localhost:27017")
+	jaegerAddr  = common.EnvString("JAEGER_ADDR", "localhost:4318")
 )
 
 func main() {
@@ -31,70 +39,80 @@ func main() {
 
 	zap.ReplaceGlobals(logger)
 
-	err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddress)
-
-	if err != nil {
-		log.Fatalf("Failed to set tracer: %v", err)
+	if err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddr); err != nil {
+		logger.Fatal("could set global tracer", zap.Error(err))
 	}
 
-	registry, err := consul.NewRegistry(consulAddress, serviceName)
-
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
 	if err != nil {
 		panic(err)
 	}
 
 	ctx := context.Background()
-	instanceId := discovery.GenerateInstanceId(serviceName)
-
-	if err := registry.Register(ctx, instanceId, serviceName, grpcAddress); err != nil {
+	instanceID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanceID, serviceName, grpcAddr); err != nil {
 		panic(err)
 	}
 
 	go func() {
 		for {
-			if err := registry.HealthCheck(instanceId, serviceName); err != nil {
-				log.Printf("Failed to check health: %v", err)
+			if err := registry.HealthCheck(instanceID, serviceName); err != nil {
+				logger.Error("Failed to health check", zap.Error(err))
 			}
-
-			time.Sleep(5 * time.Second)
+			time.Sleep(time.Second * 1)
 		}
 	}()
 
-	defer registry.DeRegister(ctx, instanceId, serviceName)
+	defer registry.Deregister(ctx, instanceID, serviceName)
 
-	channel, close := broker.Connect(amqpUser, amqpPassword, amqpHost, amqpPort)
-
+	ch, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
 	defer func() {
 		close()
-		channel.Close()
+		ch.Close()
 	}()
+
+	// mongo db conn
+	uri := fmt.Sprintf("mongodb://%s:%s@%s", mongoUser, mongoPass, mongoAddr)
+	mongoClient, err := connectToMongoDB(uri)
+	if err != nil {
+		logger.Fatal("failed to connect to mongo db", zap.Error(err))
+	}
 
 	grpcServer := grpc.NewServer()
 
-	l, err := net.Listen("tcp", grpcAddress)
-
+	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatal(err.Error())
+		logger.Fatal("failed to listen", zap.Error(err))
 	}
-
 	defer l.Close()
 
-	store := NewStore()
+	gateway := gateway.NewGateway(registry)
 
-	service := NewService(store)
+	store := NewStore(mongoClient)
+	svc := NewService(store, gateway)
+	svcWithTelemetry := NewTelemetryMiddleware(svc)
+	svcWithLogging := NewLoggingMiddleware(svcWithTelemetry)
 
-	serviceWithTelemetry := NewTelemetryMiddleware(service)
-	serviceWithLogging := NewLoggingMiddleware(serviceWithTelemetry)
+	NewGRPCHandler(grpcServer, svcWithLogging, ch)
 
-	NewGrpcHandler(grpcServer, serviceWithLogging, channel)
+	consumer := NewConsumer(svcWithLogging)
+	go consumer.Listen(ch)
 
-	consumer := NewConsumer(serviceWithLogging)
-
-	go consumer.Listen(channel)
-
-	log.Printf("Orders service started at %s", grpcAddress)
+	logger.Info("Starting HTTP server", zap.String("port", grpcAddr))
 
 	if err := grpcServer.Serve(l); err != nil {
-		log.Fatal(err.Error())
+		logger.Fatal("failed to serve", zap.Error(err))
 	}
+}
+
+func connectToMongoDB(uri string) (*mongo.Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, err
+	}
+
+	err = client.Ping(ctx, readpref.Primary())
+	return client, err
 }

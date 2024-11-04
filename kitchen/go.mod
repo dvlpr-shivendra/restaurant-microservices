@@ -1,3 +1,3 @@
-module restaurant-backend/kitchen
+module github.com/sikozonpc/omsv2-kitchen
 
-go 1.22.2
+go 1.22.0

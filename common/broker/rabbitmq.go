@@ -13,34 +13,35 @@ import (
 const MaxRetryCount = 3
 const DLQ = "dlq_main"
 
-func Connect(user, password, host, port string) (*amqp.Channel, func() error) {
-	address := fmt.Sprintf("amqp://%s:%s@%s:%s", user, password, host, port)
+func Connect(user, pass, host, port string) (*amqp.Channel, func() error) {
+	address := fmt.Sprintf("amqp://%s:%s@%s:%s", user, pass, host, port)
 
 	conn, err := amqp.Dial(address)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	channel, err := conn.Channel()
-
+	ch, err := conn.Channel()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = channel.ExchangeDeclare(OrderCreatedEvent, "direct", true, false, false, false, nil)
-
+	err = ch.ExchangeDeclare(OrderCreatedEvent, "direct", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = channel.ExchangeDeclare(OrderPaidEvent, "fanout", true, false, false, false, nil)
-
+	err = ch.ExchangeDeclare(OrderPaidEvent, "fanout", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return channel, conn.Close
+	err = createDLQAndDLX(ch)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ch, conn.Close
 }
 
 func HandleRetry(ch *amqp.Channel, d *amqp.Delivery) error {

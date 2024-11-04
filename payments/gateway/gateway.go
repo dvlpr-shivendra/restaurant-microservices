@@ -1,9 +1,7 @@
 package gateway
 
-import (
-	"context"
-)
+import "context"
 
 type OrdersGateway interface {
-	UpdateOrderAfterPaymentLink(ctx context.Context, orderId, paymentLink string) error
+	UpdateOrderAfterPaymentLink(ctx context.Context, orderID, paymentLink string) error
 }

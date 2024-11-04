@@ -1,10 +1,8 @@
 package main
 
-import (
-	pb "restaurant-backend/common/api"
-)
+import pb "github.com/sikozonpc/commons/api"
 
-type CreateOrderResponse struct {
-	Order       *pb.Order `"json:"order"`
-	RedirectUrl string    `"json:"redirectUrl"`
+type CreateOrderRequest struct {
+	Order         *pb.Order `"json": order`
+	RedirectToURL string    `"json": redirectToURL`
 }

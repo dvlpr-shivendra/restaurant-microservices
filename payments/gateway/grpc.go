@@ -3,35 +3,32 @@ package gateway
 import (
 	"context"
 	"log"
-	"restaurant-backend/common/discovery"
 
-	pb "restaurant-backend/common/api"
+	pb "github.com/sikozonpc/commons/api"
+	"github.com/sikozonpc/commons/discovery"
 )
 
 type gateway struct {
 	registry discovery.Registry
 }
 
-func NewGRPCGateway(registry discovery.Registry) *gateway {
+func NewGateway(registry discovery.Registry) *gateway {
 	return &gateway{registry}
 }
 
-func (g *gateway) UpdateOrderAfterPaymentLink(ctx context.Context, orderId, paymentLink string) error {
-	conn, err := discovery.ServiceConnection(ctx, "orders", g.registry)
-
+func (g *gateway) UpdateOrderAfterPaymentLink(ctx context.Context, orderID, paymentLink string) error {
+	conn, err := discovery.ServiceConnection(context.Background(), "orders", g.registry)
 	if err != nil {
-		log.Fatalf("Failed to connect to orders service: %v", err);
+		log.Fatalf("Failed to dial server: %v", err)
 	}
-
 	defer conn.Close()
 
-	orderClient := pb.NewOrderServiceClient(conn)
+	ordersClient := pb.NewOrderServiceClient(conn)
 
-	_, err = orderClient.UpdateOrder(ctx, &pb.Order{
-		Id: orderId,
-		Status: "waiting_payment",
+	_, err = ordersClient.UpdateOrder(ctx, &pb.Order{
+		ID:          orderID,
+		Status:      "waiting_payment",
 		PaymentLink: paymentLink,
 	})
-
 	return err
 }

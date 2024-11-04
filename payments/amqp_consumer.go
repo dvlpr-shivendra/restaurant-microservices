@@ -7,8 +7,8 @@ import (
 	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-	pb "restaurant-backend/common/api"
-	"restaurant-backend/common/broker"
+	pb "github.com/sikozonpc/commons/api"
+	"github.com/sikozonpc/commons/broker"
 	"go.opentelemetry.io/otel"
 )
 

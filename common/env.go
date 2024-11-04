@@ -1,11 +1,13 @@
 package common
 
-import "syscall"
+import (
+	"syscall"
+)
 
-func Env(key, fallback string) string {
-	if value, ok := syscall.Getenv(key); ok {
-		return value
+func EnvString(key, fallback string) string {
+	if val, ok := syscall.Getenv(key); ok {
+		return val
 	}
+
 	return fallback
-	
 }

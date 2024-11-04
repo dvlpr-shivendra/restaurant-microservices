@@ -1,9 +1,8 @@
 package common
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
-	ErrNoItems = errors.New("no items provided")
+	ErrNoItems = errors.New("items must have at least one item")
+	ErrNoStock = errors.New("some item is not in stock")
 )

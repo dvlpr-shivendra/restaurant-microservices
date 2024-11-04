@@ -5,18 +5,16 @@ import (
 	"net/http"
 )
 
-func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
+func WriteJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
-func ReadJSON(r *http.Request, data interface{}) error {
+func ReadJSON(r *http.Request, data any) error {
 	return json.NewDecoder(r.Body).Decode(data)
 }
 
 func WriteError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	WriteJSON(w, status, map[string]string{"error": message})
 }

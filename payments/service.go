@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	pb "restaurant-backend/common/api"
-	"restaurant-backend/payments/gateway"
-	"restaurant-backend/payments/processor"
+
+	pb "github.com/sikozonpc/commons/api"
+	"github.com/sikozonpc/omsv2-payments/gateway"
+	"github.com/sikozonpc/omsv2-payments/processor"
 )
 
 type service struct {
@@ -16,12 +17,17 @@ func NewService(processor processor.PaymentProcessor, gateway gateway.OrdersGate
 	return &service{processor, gateway}
 }
 
-func (s *service) CreatePayment(ctx context.Context, order *pb.Order) (string, error) {
-	link, err := s.processor.CreatePaymentLink(order)
-
+func (s *service) CreatePayment(ctx context.Context, o *pb.Order) (string, error) {
+	link, err := s.processor.CreatePaymentLink(o)
 	if err != nil {
 		return "", err
 	}
 
-	return link, s.gateway.UpdateOrderAfterPaymentLink(ctx, order.Id, link)
+	// update order with the link
+	err = s.gateway.UpdateOrderAfterPaymentLink(ctx, o.ID, link)
+	if err != nil {
+		return "", err
+	}
+
+	return link, nil
 }

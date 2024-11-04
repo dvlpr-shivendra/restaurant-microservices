@@ -2,71 +2,74 @@ package main
 
 import (
 	"context"
-	"log"
 
-	"restaurant-backend/common"
-	pb "restaurant-backend/common/api"
+	common "github.com/sikozonpc/commons"
+	pb "github.com/sikozonpc/commons/api"
+	"github.com/sikozonpc/omsv2-orders/gateway"
 )
 
 type service struct {
-	store OrdersStore
+	store   OrdersStore
+	gateway gateway.StockGateway
 }
 
-func NewService(store OrdersStore) *service {
-	return &service{store}
+func NewService(store OrdersStore, gateway gateway.StockGateway) *service {
+	return &service{store, gateway}
 }
 
-func (s *service) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Order, error) {
-	return s.store.Get(ctx, req.OrderId, req.CustomerId)
-}
-
-func (s *service) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest, items []*pb.Item) (*pb.Order, error) {
-
-	id, err := s.store.Create(ctx, req, items)
-
+func (s *service) GetOrder(ctx context.Context, p *pb.GetOrderRequest) (*pb.Order, error) {
+	o, err := s.store.Get(ctx, p.OrderID, p.CustomerID)
 	if err != nil {
 		return nil, err
 	}
 
-	order := &pb.Order{
-		Id:         id,
-		CustomerId: req.CustomerId,
-		Items:      items,
-		Status:     "pending",
+	return o.ToProto(), nil
+}
+
+func (s *service) UpdateOrder(ctx context.Context, o *pb.Order) (*pb.Order, error) {
+	err := s.store.Update(ctx, o.ID, o)
+	if err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
+func (s *service) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest, items []*pb.Item) (*pb.Order, error) {
+	id, err := s.store.Create(ctx, Order{
+		CustomerID:  p.CustomerID,
+		Status:      "pending",
+		Items:       items,
 		PaymentLink: "",
-	}
-
-	return order, nil
-}
-
-func (s *service) UpdateOrder(ctx context.Context, order *pb.Order) (*pb.Order, error) {
-	err := s.store.Update(ctx, order.Id, order)
-
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return order, nil
+	o := &pb.Order{
+		ID:         id.Hex(),
+		CustomerID: p.CustomerID,
+		Status:     "pending",
+		Items:      items,
+	}
+
+	return o, nil
 }
 
-func (s *service) ValidateOrder(ctx context.Context, req *pb.CreateOrderRequest) ([]*pb.Item, error) {
-	if len(req.Items) == 0 {
+func (s *service) ValidateOrder(ctx context.Context, p *pb.CreateOrderRequest) ([]*pb.Item, error) {
+	if len(p.Items) == 0 {
 		return nil, common.ErrNoItems
 	}
 
-	mergedItems := mergeItemsQuantities(req.Items)
+	mergedItems := mergeItemsQuantities(p.Items)
 
-	log.Printf("Merged items: %v", mergedItems)
-
-	// temp
-	var items []*pb.Item
-
-	for _, item := range mergedItems {
-		items = append(items, &pb.Item{
-			Id:       item.Id,
-			Quantity: item.Quantity,
-			PriceId:  "1",
-		})
+	// validate with the stock service
+	inStock, items, err := s.gateway.CheckIfItemIsInStock(ctx, p.CustomerID, mergedItems)
+	if err != nil {
+		return nil, err
+	}
+	if !inStock {
+		return items, common.ErrNoStock
 	}
 
 	return items, nil
@@ -77,9 +80,9 @@ func mergeItemsQuantities(items []*pb.ItemsWithQuantity) []*pb.ItemsWithQuantity
 
 	for _, item := range items {
 		found := false
-		for _, mergedItem := range merged {
-			if mergedItem.Id == item.Id {
-				mergedItem.Quantity += item.Quantity
+		for _, finalItem := range merged {
+			if finalItem.ID == item.ID {
+				finalItem.Quantity += item.Quantity
 				found = true
 				break
 			}
@@ -88,7 +91,7 @@ func mergeItemsQuantities(items []*pb.ItemsWithQuantity) []*pb.ItemsWithQuantity
 		if !found {
 			merged = append(merged, item)
 		}
-
 	}
+
 	return merged
 }

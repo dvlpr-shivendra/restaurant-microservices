@@ -2,50 +2,60 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	pb "restaurant-backend/common/api"
+
+	pb "github.com/sikozonpc/commons/api"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var orders = make([]*pb.Order, 0)
+const (
+	DbName   = "orders"
+	CollName = "orders"
+)
 
 type store struct {
+	db *mongo.Client
 }
 
-func NewStore() *store {
-	return &store{}
+func NewStore(db *mongo.Client) *store {
+	return &store{db}
 }
 
-func (s *store) Create(ctx context.Context, p *pb.CreateOrderRequest, items []*pb.Item) (string, error) {
-	id := fmt.Sprint(len(orders) + 1)
+func (s *store) Create(ctx context.Context, o Order) (primitive.ObjectID, error) {
+	col := s.db.Database(DbName).Collection(CollName)
 
-	orders = append(orders, &pb.Order{
-		Id:         id,
-		CustomerId: p.CustomerId,
-		Status:     "pending",
-	})
+	newOrder, err := col.InsertOne(ctx, o)
 
-	return id, nil
+	id := newOrder.InsertedID.(primitive.ObjectID)
+	return id, err
 }
 
-func (s *store) Get(ctx context.Context, id, customerId string) (*pb.Order, error) {
-	for _, o := range orders {
-		if o.Id == id && o.CustomerId == customerId {
-			return o, nil
-		}
-	}
+func (s *store) Get(ctx context.Context, id, customerID string) (*Order, error) {
+	col := s.db.Database(DbName).Collection(CollName)
 
-	return nil, errors.New("order not found")
+	oID, _ := primitive.ObjectIDFromHex(id)
+
+	var o Order
+	err := col.FindOne(ctx, bson.M{
+		"_id":        oID,
+		"customerID": customerID,
+	}).Decode(&o)
+
+	return &o, err
 }
 
 func (s *store) Update(ctx context.Context, id string, newOrder *pb.Order) error {
-	for i, order := range orders {
-		if order.Id == id {
-			orders[i].Status = newOrder.Status
-			orders[i].PaymentLink = newOrder.PaymentLink
-			return nil
-		}
-	}
+	col := s.db.Database(DbName).Collection(CollName)
 
-	return nil
+	oID, _ := primitive.ObjectIDFromHex(id)
+
+	_, err := col.UpdateOne(ctx,
+		bson.M{"_id": oID},
+		bson.M{"$set": bson.M{
+			"paymentLink": newOrder.PaymentLink,
+			"status":      newOrder.Status,
+		}})
+
+	return err
 }

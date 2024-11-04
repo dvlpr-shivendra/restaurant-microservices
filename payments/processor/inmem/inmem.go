@@ -1,17 +1,13 @@
 package inmem
 
-import (
-	pb "restaurant-backend/common/api"
-)
+import pb "github.com/sikozonpc/commons/api"
 
-type inmem struct {
+type Inmem struct {}
+
+func NewInmem() *Inmem {
+	return &Inmem{}
 }
 
-func NewProcessor() *inmem {
-	return &inmem{}
-}
-
-func (p *inmem) CreatePaymentLink(order *pb.Order) (string, error) {
-	// TODO: Implement in-memory payment link generation logic
+func (i *Inmem) CreatePaymentLink(*pb.Order) (string, error) {
 	return "dummy-link", nil
 }

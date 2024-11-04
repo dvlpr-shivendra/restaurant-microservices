@@ -2,10 +2,11 @@ package gateway
 
 import (
 	"context"
-	pb "restaurant-backend/common/api"
+
+	pb "github.com/sikozonpc/commons/api"
 )
 
 type OrdersGateway interface {
-	CreateOrder(ctx context.Context, order *pb.CreateOrderRequest) (*pb.Order, error)
-	GetOrder(ctx context.Context, orderId, customerId string) (*pb.Order, error)
+	CreateOrder(context.Context, *pb.CreateOrderRequest) (*pb.Order, error)
+	GetOrder(ctx context.Context, orderID, customerID string)(*pb.Order, error)
 }

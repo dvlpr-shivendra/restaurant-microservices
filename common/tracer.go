@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"log"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -10,16 +9,16 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
-func SetGlobalTracer(ctx context.Context, serviceName, exportAddress string) error {
-	client := otlptracehttp.NewClient(otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(exportAddress))
+func SetGlobalTracer(ctx context.Context, serviceName, exporterEndpoint string) error {
+	client := otlptracehttp.NewClient(
+		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithEndpoint(exporterEndpoint))
 
 	exporter, err := otlptrace.New(ctx, client)
-
 	if err != nil {
-		log.Fatalf("failed to initialize exporter: %v", err)
 		return err
 	}
 
@@ -30,9 +29,8 @@ func SetGlobalTracer(ctx context.Context, serviceName, exportAddress string) err
 			semconv.ServiceNameKey.String(serviceName),
 		)),
 	)
-	
+
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-
 	return nil
 }
